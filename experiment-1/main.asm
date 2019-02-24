@@ -11,82 +11,9 @@ playerX equ $DE01
 enemyX equ $DE05
 enemyY equ $DE04
 
-SECTION "Interrupts", ROM0[$0]
+INCLUDE "interrupts.asm"
+INCLUDE "header.asm"
 
-ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 08
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 10
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 18
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 20
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 28
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 30
-  ret
-  REPT 7
-    nop
-  ENDR
-  ; RST 38
-  ret
-  REPT 7
-    nop
-  ENDR
-
-
-; IRQs are RST 40-67, in order
-; vblank, status (often hblank), timer, serial, keys
-
-  jp VBlank
-  REPT 5
-    nop
-  ENDR
-  jp stat
-  REPT 5
-    nop
-  ENDR
-  jp timer
-  REPT 5
-    nop
-  ENDR
-  jp serial
-  REPT 5
-    nop
-  ENDR
-  jp joypad
-  REPT 5
-    nop
-  ENDR
-
-SECTION "Header", ROM0[$100]
-
-EntryPoint: ; This is where execution begins
-    di ; Disable interrupts
-    jp Start ; Leave this tiny space
-; === NO MORE CODE HERE!!! ===
-REPT $150 - $104
-    db 0
-ENDR
 
 VBlank:
     ld hl, fVblank
@@ -95,7 +22,9 @@ VBlank:
     cp a, $01
     jr nz, dontRenderBackground
 
-    ld a, %10000011
+    ld a, %00011011
+    ld [rBGP], a
+    ld a, %10000001
     ld [rLCDC], a
 
 dontRenderBackground
@@ -137,16 +66,20 @@ lcdoff:
     ld [rLCDC], a ; We will have to write to LCDC again later, so it's not a bother, really.
     ret
 
+copyDmaRoutineToHRAM:
+    ld hl, run_dma
+    ld de, run_dma_master
+    ld bc, run_dma_end - run_dma_master
+    call memcpy
+    ret
+
 Start:
     ; Turn off the LCD
     call lcdoff
 
     ; Move dma copy code into high ram
-    ld hl, run_dma
-    ld de, run_dma_master
-    ld bc, run_dma_end - run_dma_master
-    call memcpy
-
+    
+    call copyDmaRoutineToHRAM
 
     ; Copy font data in to VRAM
     ld hl, _VRAM
@@ -178,8 +111,9 @@ Start:
 
    ; configure background palette
     ld a, %11100100
-    ld [rBGP], a
     ld [rOBP0], a
+    ld [rBGP], a
+    
 
     ;xor a ; ld a, 0
     ld a, 0;
@@ -267,6 +201,20 @@ gameOver
 loop
     halt
     nop
+    ld a, $10
+    ld [$FF00], a
+    ld a, [$FF00]
+    ld a, [$FF00]
+    ld a, [$FF00]
+    ld a, [$FF00]
+    ld a, [$FF00]
+    ld a, [$FF00]
+    cpl 
+    and $0F
+    ld [playerInput], a
+    and $01
+    jp nz, Start
+
     jr loop
 
 
